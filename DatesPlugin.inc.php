@@ -75,8 +75,12 @@ class DatesPlugin extends GenericPlugin {
 		// Loop through the decisions
 		foreach ($decisions as $decision) {
 			// If we have a review stage decision and it was a submission accepted decision, get to date for the decision
-			if ($decision->getData('stageId') == '3' && $decision->getData('decision') == '1'){
-				$reviewdate = $decision->getData('dateDecided');
+			if ($decision->getData('stageId') == '1' && $decision->getData('decision') == '17'){
+				$reviewdate = $decision->getData('dateDecided'); // Take the date when the editor made the decision to accept the article without peer review progress
+			} elseif ($decision->getData('stageId') == '3' && $decision->getData('decision') == '2'){
+				$reviewdate = $decision->getData('dateDecided'); // Take the date when the editor made the decision to accept the article with peer review progress
+			} elseif ($decision->getData('stageId') == '3' && $decision->getData('decision') == '1'){
+				$reviewdate = $decision->getData('dateDecided'); // Take the date when the article published with previous version of OJS (Before OJS 3.4.0.5)
 			}
 		}
 
