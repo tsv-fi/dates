@@ -3,101 +3,207 @@
 /**
  * @file plugins/generic/dates/DatesPlugin.inc.php
  *
- * Copyright (c) 2014-2021 Simon Fraser University
- * Copyright (c) 2003-2021 John Willinsky
+ * Copyright (c) 2014-2026 Simon Fraser University
+ * Copyright (c) 2003-2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class dates
- * @ingroup plugins_generic_dates
+ * Dates Plugin for OJS 3.5
  *
- * @brief dates plugin class
+ * Adds publication and editorial workflow dates
+ * to the public article page.
  */
 
+use APP\core\Application;
 use APP\decision\Decision;
 use APP\facades\Repo;
+
 use PKP\plugins\GenericPlugin;
+use PKP\plugins\Hook;
 
-class DatesPlugin extends GenericPlugin {
-	/**
-	 * Called as a plugin is registered to the registry
-	 * @param $category String Name of category plugin was registered to
-	 * @return boolean True if plugin initialized successfully; if false,
-	 * 	the plugin will not be registered.
-	 */
-	function register($category, $path, $mainContextId = NULL) {
-		$success = parent::register($category, $path, $mainContextId);
-		if (!Config::getVar('general', 'installed') || defined('RUNNING_UPGRADE')) return true;
-		if ($success && $this->getEnabled()) {
-			HookRegistry::register('Templates::Article::Details', array($this, 'addDates'));
-		}
-		return $success;
-	}
+class DatesPlugin extends GenericPlugin
+{
+    /**
+     * Register the plugin
+     */
+    public function register($category, $path, $mainContextId = null)
+    {
+        $success = parent::register($category, $path, $mainContextId);
 
-	/**
-	 * Get the plugin display name.
-	 * @return string
-	 */
-	function getDisplayName() {
-		return __('plugins.generic.dates.displayName');
-	}
+        if ($success && $this->getEnabled($mainContextId)) {
+            Hook::add(
+                'Templates::Article::Details',
+                [$this, 'addDates']
+            );
+        }
 
-	/**
-	 * Get the plugin description.
-	 * @return string
-	 */
-	function getDescription() {
-		return __('plugins.generic.dates.description');
-	}
+        return $success;
+    }
 
-	/**
-	 * Add dates to article landing page
-	 * @param $hookName string
-	 * @param $params array
-	 */
-	function addDates($hookName, $params) {
-		$request = $this->getRequest();
-		$context = $request->getContext();
+    /**
+     * Plugin display name
+     */
+    public function getDisplayName()
+    {
+        return __('plugins.generic.dates.displayName');
+    }
 
-		$smarty = $params[1];
-		$output =& $params[2];
+    /**
+     * Plugin description
+     */
+    public function getDescription()
+    {
+        return __('plugins.generic.dates.description');
+    }
 
-		$article = $smarty->getTemplateVars('article');
+    /**
+     * Safe PHP 8.1+ date formatting
+     */
+    protected function formatDate($dateString, $locale = 'en_US')
+    {
+        if (!$dateString) {
+            return null;
+        }
 
-		$dates = "";
-		$submitdate = $article->getDateSubmitted();
-		$publishdate = $article->getDatePublished();
-		$reviewdate = "";
+        $timestamp = strtotime($dateString);
 
-        $decisions = Repo::decision()->getCollector()
+        if (!$timestamp) {
+            return null;
+        }
+
+        $formatter = new \IntlDateFormatter(
+            $locale,
+            \IntlDateFormatter::MEDIUM,
+            \IntlDateFormatter::NONE
+        );
+
+        return $formatter->format($timestamp);
+    }
+
+    /**
+     * Add article dates to template output
+     */
+    public function addDates($hookName, $args)
+    {
+        error_log('DATES PLUGIN HOOK FIRED');
+
+        /**
+         * VERY IMPORTANT:
+         * For frontend template hooks:
+         *
+         * $args[1] = TemplateManager
+         * $args[2] = output (by reference)
+         */
+        $templateMgr = $args[1];
+        $output =& $args[2];
+
+        $article = $templateMgr->getTemplateVars('article');
+        $publication = $templateMgr->getTemplateVars('publication');
+
+        if (!$article || !$publication) {
+            error_log('DATES PLUGIN: article or publication missing');
+            return false;
+        }
+
+        $request = Application::get()->getRequest();
+        if (!$request) {
+            return false;
+        }
+
+        $context = $request->getContext();
+        if (!$context) {
+            return false;
+        }
+
+        $dates = [];
+
+        /**
+         * Better locale handling for OJS
+         */
+        $locale = $context->getPrimaryLocale();
+        if (!$locale) {
+            $locale = 'en_US';
+        }
+
+        /**
+         * Submitted date
+         */
+        $dateSubmitted = $article->getData('dateSubmitted');
+
+        if ($dateSubmitted) {
+            $dates['submitted'] = $this->formatDate(
+                $dateSubmitted,
+                $locale
+            );
+        }
+
+        /**
+         * Published date
+         * IMPORTANT:
+         * This comes from publication, not article
+         */
+        $datePublished = $publication->getData('datePublished');
+
+        if ($datePublished) {
+            $dates['published'] = $this->formatDate(
+                $datePublished,
+                $locale
+            );
+        }
+
+        /**
+         * Accepted date via editorial decisions
+         */
+        try {
+            $decisions = Repo::decision()
+                ->getCollector()
                 ->filterBySubmissionIds([$article->getId()])
                 ->getMany();
 
-		// Loop through the decisions
-		foreach ($decisions as $decision) {
-			// If we have a review stage decision and it was a submission accepted decision, get to date for the decision
-			// Note that since version 3.4 the decision value has changed from '1' to '2' for accepted
-			if ($decision->getData('stageId') == '3' && $decision->getData('decision') == '2'){
-				$reviewdate = $decision->getData('dateDecided');
-			}
-		}
+            foreach ($decisions as $decision) {
+                if (
+                    (int) $decision->getData('decision')
+                    === (int) Decision::ACCEPT
+                ) {
+                    $dates['accepted'] = $this->formatDate(
+                        $decision->getData('dateDecided'),
+                        $locale
+                    );
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+            /**
+             * Never break article rendering because of plugin issues
+             */
+            error_log(
+                'DatesPlugin decision lookup failed: '
+                . $e->getMessage()
+            );
+        }
 
-		$dates = array();
-		$dateFormatShort = PKPString::convertStrftimeFormat($context->getLocalizedDateFormatShort($locale));
+        /**
+         * Debug log
+         */
+        error_log(
+            'DATES PLUGIN DATA: ' . print_r($dates, true)
+        );
 
-		if ($submitdate)
-			$dates['received'] = date($dateFormatShort,strtotime($submitdate));
-		if ($reviewdate)
-			$dates['accepted'] = date($dateFormatShort,strtotime($reviewdate));
-		if ($publishdate)
-			$dates['published'] = date($dateFormatShort,strtotime($publishdate));
+        /**
+         * Assign to Smarty
+         */
+        $templateMgr->assign(
+            'datesPluginDates',
+            $dates
+        );
 
-		// Only show dates if there was a review
-		if ($reviewdate){
-			$smarty->assign('dates', $dates);
-			$output .= $smarty->fetch($this->getTemplateResource('dates.tpl'));
-		}
-		return false;
-	}
+        /**
+         * THIS is the crucial part:
+         * append rendered template output
+         */
+        $output .= $templateMgr->fetch(
+            $this->getTemplateResource('dates.tpl')
+        );
+
+        return false;
+    }
 }
-
-?>
