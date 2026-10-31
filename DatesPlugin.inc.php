@@ -18,6 +18,7 @@ use APP\decision\Decision;
 use APP\facades\Repo;
 
 use PKP\plugins\GenericPlugin;
+use PKP\facades\Locale;
 use PKP\plugins\Hook;
 
 class DatesPlugin extends GenericPlugin
@@ -117,7 +118,7 @@ class DatesPlugin extends GenericPlugin
         /**
          * Better locale handling for OJS
          */
-        $locale = $context->getPrimaryLocale();
+        $locale = Locale::getLocale();
         if (!$locale) {
             $locale = 'en_US';
         }
