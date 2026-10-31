@@ -84,8 +84,6 @@ class DatesPlugin extends GenericPlugin
      */
     public function addDates($hookName, $args)
     {
-        error_log('DATES PLUGIN HOOK FIRED');
-
         /**
          * VERY IMPORTANT:
          * For frontend template hooks:
@@ -180,13 +178,6 @@ class DatesPlugin extends GenericPlugin
                 . $e->getMessage()
             );
         }
-
-        /**
-         * Debug log
-         */
-        error_log(
-            'DATES PLUGIN DATA: ' . print_r($dates, true)
-        );
 
         /**
          * Assign to Smarty
