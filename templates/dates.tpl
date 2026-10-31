@@ -11,19 +11,19 @@
 <div class="item">
 		{if $datesPluginDates.submitted}
      		<div class="value">
-				<strong>Submitted:</strong> {$datesPluginDates.submitted}
+				<strong>{translate key="plugins.generic.dates.received"}:</strong> {$datesPluginDates.submitted}
 			</div>
 		{/if}
 	
 		{if $datesPluginDates.accepted}
      		<div class="value">
-				<strong>Accepted:</strong> {$datesPluginDates.accepted}
+				<strong>{translate key="plugins.generic.dates.accepted"}:</strong> {$datesPluginDates.accepted}
 			</div>
 		{/if}
 	
 		{if $datesPluginDates.published}
      		<div class="value">
-				<strong>Published:</strong> {$datesPluginDates.published}
+				<strong>{translate key="plugins.generic.dates.published"}:</strong> {$datesPluginDates.published}
 			</div>
 		{/if}
 </div>
