@@ -1,0 +1,19 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: uk\n"
+
+msgid "plugins.generic.dates.displayName"
+msgstr "Плагін дат"
+
+msgid "plugins.generic.dates.description"
+msgstr "Додає дати отримання, прийняття та публікації на сторінку статті."
+
+msgid "plugins.generic.dates.received"
+msgstr "Отримано"
+
+msgid "plugins.generic.dates.accepted"
+msgstr "Прийнято"
+
+msgid "plugins.generic.dates.published"
+msgstr "Опубліковано"
